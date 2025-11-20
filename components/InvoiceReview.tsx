@@ -12,18 +12,28 @@ interface InvoiceReviewProps {
 
 const InvoiceReview: React.FC<InvoiceReviewProps> = ({ data, onUpdate, onConfirm, onCancel, isLoading }) => {
 
-  // Al montar, asegurar que haya fecha y hora por defecto (Argentina)
+  // Al montar, asegurar que haya fecha y hora por defecto si vinieron vacías
   useEffect(() => {
-    if (!data.date || !data.time) {
-        const now = new Date();
-        const argentinaDate = now.toLocaleDateString('es-AR', { timeZone: 'America/Argentina/Buenos_Aires', year: 'numeric', month: '2-digit', day: '2-digit' }).split('/').reverse().join('-');
-        const argentinaTime = now.toLocaleTimeString('es-AR', { timeZone: 'America/Argentina/Buenos_Aires', hour: '2-digit', minute: '2-digit' });
-        
-        onUpdate({
-            ...data,
-            date: data.date || argentinaDate,
-            time: data.time || argentinaTime
-        });
+    const now = new Date();
+    // Construir manualmente YYYY-MM-DD para evitar problemas de zona horaria
+    const year = now.getFullYear();
+    const month = String(now.getMonth() + 1).padStart(2, '0');
+    const day = String(now.getDate()).padStart(2, '0');
+    const currentDate = `${year}-${month}-${day}`;
+    const currentTime = now.toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit', hour12: false });
+
+    let updates: Partial<InvoiceData> = {};
+    
+    // Si la fecha viene vacía o parece ser una fecha vieja "default" (ej: 2024), forzar la actual
+    if (!data.date) {
+        updates.date = currentDate;
+    }
+    if (!data.time) {
+        updates.time = currentTime;
+    }
+
+    if (Object.keys(updates).length > 0) {
+        onUpdate({ ...data, ...updates });
     }
   }, []);
 
@@ -101,7 +111,7 @@ const InvoiceReview: React.FC<InvoiceReviewProps> = ({ data, onUpdate, onConfirm
                         />
                     </div>
                  </div>
-                 <div className="w-1/3">
+                 <div className="w-[110px]">
                     <label className="block text-xs font-medium text-gray-500 mb-1 uppercase">Hora</label>
                     <div className="relative">
                         <Clock className="absolute left-3 top-2.5 w-4 h-4 text-gray-400" />
@@ -120,7 +130,6 @@ const InvoiceReview: React.FC<InvoiceReviewProps> = ({ data, onUpdate, onConfirm
                  <div className="p-3 bg-blue-50 rounded-xl border border-blue-100">
                     <p className="text-xs text-blue-800">
                        <strong>Programado:</strong> Esta factura se generará con fecha {data.scheduledFor}.
-                       <br/><span className="text-[10px] opacity-75">*Solo válido para servicios o productos dentro del rango permitido por AFIP.</span>
                     </p>
                  </div>
             )}
@@ -130,7 +139,7 @@ const InvoiceReview: React.FC<InvoiceReviewProps> = ({ data, onUpdate, onConfirm
       {/* Items Table */}
       <div className="mb-6">
         <div className="flex justify-between items-center mb-2">
-            <label className="block text-xs font-medium text-gray-500 uppercase">Items</label>
+            <label className="block text-xs font-medium text-gray-500 uppercase">Items (Palabras Clave)</label>
         </div>
         
         <div className="bg-gray-50 rounded-2xl p-4 space-y-3">
@@ -140,7 +149,7 @@ const InvoiceReview: React.FC<InvoiceReviewProps> = ({ data, onUpdate, onConfirm
                         type="text" 
                         value={item.name} 
                         onChange={(e) => handleItemChange(idx, 'name', e.target.value)}
-                        className="flex-grow bg-transparent border-none focus:ring-0 font-medium text-gray-800 placeholder-gray-400 w-full"
+                        className="flex-grow bg-transparent border-none focus:ring-0 font-medium text-gray-800 placeholder-gray-400 w-full capitalize"
                         placeholder="Producto"
                     />
                     <div className="flex items-center gap-2 w-full sm:w-auto justify-between sm:justify-start">
