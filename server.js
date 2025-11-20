@@ -83,7 +83,7 @@ app.post('/api/create-invoice', async (req, res) => {
         });
 
         const cbteTipo = mapInvoiceType(invoice.type);
-        const concepto = mapConceptType(invoice.concept);
+        let concepto = mapConceptType(invoice.concept);
         const puntoVenta = invoice.posNumber || 1; 
 
         // Obtener último comprobante
@@ -103,10 +103,14 @@ app.post('/api/create-invoice', async (req, res) => {
              invoiceDateInt = parseInt(new Date().toISOString().slice(0,10).replace(/-/g, ''));
         }
 
-        // Validacion básica de fechas futuras vs concepto
+        // AUTO-CORRECCIÓN PARA FECHAS FUTURAS
+        // AFIP rechaza Concepto 1 (Productos) si la fecha es futura.
+        // Solución: Cambiar automáticamente a Concepto 2 (Servicios) si es necesario.
         const todayInt = parseInt(new Date().toISOString().slice(0,10).replace(/-/g, ''));
+        
         if (concepto === 1 && invoiceDateInt > todayInt) {
-             throw new Error("AFIP rechaza facturas de 'Productos' con fecha futura. Cambia el concepto a 'Servicios' o usa la fecha de hoy.");
+             console.log("⚠️ Fecha futura detectada en Concepto Productos. Cambiando automáticamente a Servicios para evitar rechazo de AFIP.");
+             concepto = 2; // Cambiar a Servicios
         }
 
         let data = {
@@ -129,6 +133,7 @@ app.post('/api/create-invoice', async (req, res) => {
             'MonCotiz': 1,
         };
 
+        // Si es Servicios (2) o Productos y Servicios (3) (ya sea original o corregido), agregar fechas de servicio obligatorias
         if (concepto === 2 || concepto === 3) {
             data.FchServDesde = invoiceDateInt;
             data.FchServHasta = invoiceDateInt;
@@ -153,7 +158,7 @@ app.post('/api/create-invoice', async (req, res) => {
         
         // Intentar capturar errores específicos de AFIP (Soap Faults)
         if (error.message && error.message.includes('soap:Fault')) {
-             errorMessage = "Rechazo de AFIP: Revisa fechas o montos.";
+             errorMessage = `Rechazo de AFIP: ${error.message.split('soap:Fault')[1] || 'Error desconocido'}`;
         }
 
         res.status(500).json({

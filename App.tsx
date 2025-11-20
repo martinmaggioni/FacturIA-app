@@ -4,7 +4,7 @@ import { parseInvoiceRequest } from './services/geminiService';
 import { speak, cancel } from './services/ttsService';
 import VoiceInput from './components/VoiceInput';
 import InvoiceReview from './components/InvoiceReview';
-import { LogOut, CheckCircle, Clock, Volume2, VolumeX, AlertTriangle, BrainCircuit, Settings, Key, FileKey, Server, Upload, Download, FileJson, Info, Wifi, WifiOff, RefreshCw } from 'lucide-react';
+import { LogOut, CheckCircle, Clock, Volume2, VolumeX, AlertTriangle, BrainCircuit, Settings, Key, FileKey, Server, Upload, Download, FileJson, Info, Wifi, WifiOff, RefreshCw, Store } from 'lucide-react';
 
 const App: React.FC = () => {
   // --- Configuración Persistente ---
@@ -12,6 +12,7 @@ const App: React.FC = () => {
   const [cuit, setCuit] = useState('');
   const [cert, setCert] = useState('');
   const [key, setKey] = useState('');
+  const [posNumber, setPosNumber] = useState(1); // Punto de Venta
   
   // --- Estado de la App ---
   const [user, setUser] = useState<UserProfile | null>(null);
@@ -34,11 +35,13 @@ const App: React.FC = () => {
     const savedCuit = localStorage.getItem('facturia_cuit');
     const savedCert = localStorage.getItem('facturia_cert');
     const savedKey = localStorage.getItem('facturia_key');
+    const savedPos = localStorage.getItem('facturia_pos');
 
     if (savedUrl) setServerUrl(savedUrl);
     if (savedCuit) setCuit(savedCuit);
     if (savedCert) setCert(savedCert);
     if (savedKey) setKey(savedKey);
+    if (savedPos) setPosNumber(parseInt(savedPos));
   }, []);
 
   // --- Helpers ---
@@ -69,6 +72,7 @@ const App: React.FC = () => {
     localStorage.setItem('facturia_cuit', cuit);
     localStorage.setItem('facturia_cert', cleanCert);
     localStorage.setItem('facturia_key', cleanKey);
+    localStorage.setItem('facturia_pos', posNumber.toString());
     setShowSettings(false);
     playAudio("Configuración guardada.");
   };
@@ -97,7 +101,8 @@ const App: React.FC = () => {
       serverUrl,
       cuit,
       cert,
-      key
+      key,
+      posNumber
     };
     const dataStr = JSON.stringify(profileData, null, 2);
     const blob = new Blob([dataStr], { type: "application/json" });
@@ -123,6 +128,7 @@ const App: React.FC = () => {
         if (parsed.cuit) setCuit(parsed.cuit);
         if (parsed.cert) setCert(parsed.cert);
         if (parsed.key) setKey(parsed.key);
+        if (parsed.posNumber) setPosNumber(parsed.posNumber);
         
         playAudio("Perfil importado correctamente.");
       } catch (error) {
@@ -164,7 +170,7 @@ const App: React.FC = () => {
     try {
       const data = await parseInvoiceRequest(text);
       const completeData: InvoiceData = {
-        posNumber: 1, // Default POS, can be changed in review
+        posNumber: posNumber, // Usar el punto de venta configurado
         ...data
       };
       setInvoiceDraft(completeData);
@@ -324,6 +330,21 @@ const App: React.FC = () => {
                     </div>
 
                     <div>
+                        <label className="block text-xs font-bold uppercase text-gray-500 mb-1">Punto de Venta (POS)</label>
+                        <div className="flex items-center gap-2 bg-gray-50 rounded-xl px-3 py-2 border border-gray-200">
+                            <Store className="w-5 h-5 text-gray-400" />
+                            <input 
+                                type="number" 
+                                value={posNumber}
+                                onChange={(e) => setPosNumber(parseInt(e.target.value))}
+                                className="w-full bg-transparent border-none outline-none text-sm"
+                                placeholder="Ej: 4"
+                            />
+                        </div>
+                        <p className="text-[10px] text-gray-400 mt-1">El número de "Punto de Venta" habilitado en ARCA para Web Service (ej: 00004).</p>
+                    </div>
+
+                    <div>
                         <label className="block text-xs font-bold uppercase text-gray-500 mb-1">Certificado (.crt)</label>
                         <div className="bg-gray-50 rounded-xl px-3 py-2 border border-gray-200">
                             <textarea 
@@ -377,6 +398,7 @@ const App: React.FC = () => {
                     <div className="p-4 bg-gray-50 rounded-xl border border-gray-200 text-center">
                         <p className="text-xs text-gray-400 uppercase font-bold mb-1">Cuenta</p>
                         <p className="text-xl font-bold text-gray-800">{cuit}</p>
+                        <p className="text-xs text-gray-400 font-medium mt-1">POS: {posNumber}</p>
                     </div>
                     
                     <button 
