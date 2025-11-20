@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Mic, Square, Loader2 } from 'lucide-react';
+import { Mic, Square, Loader2, Radio } from 'lucide-react';
 
 interface VoiceInputProps {
   onTranscript: (text: string) => void;
@@ -8,44 +8,63 @@ interface VoiceInputProps {
 
 const VoiceInput: React.FC<VoiceInputProps> = ({ onTranscript, isProcessing }) => {
   const [isListening, setIsListening] = useState(false);
+  const [interimText, setInterimText] = useState('');
   const recognitionRef = useRef<any>(null);
 
   useEffect(() => {
     const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
     
     if (SpeechRecognition) {
-      recognitionRef.current = new SpeechRecognition();
-      recognitionRef.current.continuous = false; // En móviles es mejor false para evitar cortes
-      recognitionRef.current.interimResults = false;
-      recognitionRef.current.lang = 'es-AR'; // Forzar español Argentina
+      const recognition = new SpeechRecognition();
+      recognition.continuous = false;
+      recognition.interimResults = true; // Importante para ver que el celular escucha
+      recognition.lang = 'es-AR'; 
 
-      recognitionRef.current.onstart = () => {
+      recognition.onstart = () => {
         setIsListening(true);
+        setInterimText('');
       };
 
-      recognitionRef.current.onresult = (event: any) => {
-        const transcript = event.results[0][0].transcript;
-        if (transcript) {
-            onTranscript(transcript);
+      recognition.onresult = (event: any) => {
+        let finalTranscript = '';
+        let interimTranscript = '';
+
+        for (let i = event.resultIndex; i < event.results.length; ++i) {
+          if (event.results[i].isFinal) {
+            finalTranscript += event.results[i][0].transcript;
+          } else {
+            interimTranscript += event.results[i][0].transcript;
+          }
         }
-        setIsListening(false);
+
+        if (interimTranscript) setInterimText(interimTranscript);
+        
+        if (finalTranscript) {
+            onTranscript(finalTranscript);
+            // Detener manualmente al tener resultado final para evitar bucles
+            recognition.stop();
+        }
       };
 
-      recognitionRef.current.onerror = (event: any) => {
-        console.error("Speech recognition error", event.error);
-        // Ignorar error 'no-speech' si es muy rápido, pero resetear estado
-        setIsListening(false);
+      recognition.onerror = (event: any) => {
+        console.error("Speech error", event.error);
+        if (event.error !== 'no-speech') {
+             setIsListening(false);
+        }
       };
       
-      recognitionRef.current.onend = () => {
+      recognition.onend = () => {
         setIsListening(false);
+        setInterimText('');
       };
+
+      recognitionRef.current = recognition;
     }
   }, [onTranscript]);
 
   const toggleListening = () => {
     if (!recognitionRef.current) {
-        alert("Tu navegador no soporta reconocimiento de voz. Intenta usar Chrome o Safari.");
+        alert("Tu navegador no soporta reconocimiento de voz. Usa Chrome.");
         return;
     }
 
@@ -55,37 +74,48 @@ const VoiceInput: React.FC<VoiceInputProps> = ({ onTranscript, isProcessing }) =
       try {
         recognitionRef.current.start();
       } catch (e) {
-        console.error("Error starting speech:", e);
         setIsListening(false);
       }
     }
   };
 
   return (
-    <div className="flex flex-col items-center justify-center my-6">
+    <div className="flex flex-col items-center justify-center my-4">
       <button
         onClick={toggleListening}
         disabled={isProcessing}
         className={`
-          relative flex items-center justify-center w-20 h-20 rounded-full transition-all duration-300 shadow-lg touch-manipulation
-          ${isListening ? 'bg-red-500 scale-110 shadow-red-500/50' : 'bg-blue-600 hover:bg-blue-700 shadow-blue-600/30'}
+          relative flex items-center justify-center w-24 h-24 rounded-full transition-all duration-300 shadow-xl
+          ${isListening ? 'bg-red-500 scale-105 shadow-red-500/40' : 'bg-black hover:bg-gray-800 shadow-black/20'}
           ${isProcessing ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer active:scale-95'}
         `}
       >
         {isListening && (
-           <span className="absolute w-full h-full rounded-full bg-red-500 animate-ping opacity-75"></span>
+           <>
+            <span className="absolute w-full h-full rounded-full bg-red-500 animate-ping opacity-20"></span>
+            <span className="absolute w-[120%] h-[120%] rounded-full border border-red-500 opacity-20"></span>
+           </>
         )}
         {isProcessing ? (
-             <Loader2 className="w-8 h-8 text-white animate-spin" />
+             <Loader2 className="w-10 h-10 text-white animate-spin" />
         ) : isListening ? (
           <Square className="w-8 h-8 text-white z-10" fill="currentColor" />
         ) : (
-          <Mic className="w-8 h-8 text-white z-10" />
+          <Mic className="w-10 h-10 text-white z-10" />
         )}
       </button>
-      <p className="mt-4 text-sm text-gray-500 font-medium animate-fade-in-down">
-        {isProcessing ? 'Procesando...' : isListening ? 'Te escucho...' : 'Toca para hablar'}
-      </p>
+      
+      <div className="h-8 mt-4 flex items-center justify-center w-full">
+          {isProcessing ? (
+               <p className="text-sm text-gray-500 font-medium animate-pulse">Procesando IA...</p>
+          ) : isListening ? (
+               <p className="text-sm text-red-500 font-medium animate-pulse flex items-center gap-2">
+                   <Radio className="w-4 h-4" /> {interimText || "Escuchando..."}
+               </p>
+          ) : (
+               <p className="text-sm text-gray-400 font-medium">Toca para hablar</p>
+          )}
+      </div>
     </div>
   );
 };

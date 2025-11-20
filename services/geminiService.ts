@@ -1,33 +1,31 @@
 import { GoogleGenAI, Type } from "@google/genai";
 import { InvoiceType, ConceptType, PaymentCondition } from "../types";
 
-// Use process.env.API_KEY according to strict coding guidelines
 const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
 
 export const parseInvoiceRequest = async (prompt: string): Promise<any> => {
   const modelId = "gemini-2.5-flash";
 
-  // Obtener fecha actual en Argentina para darle contexto a la IA
   const now = new Date();
-  const argentinaDate = now.toLocaleDateString('es-AR', { timeZone: 'America/Argentina/Buenos_Aires' });
+  const argentinaDate = now.toLocaleDateString('es-AR', { timeZone: 'America/Argentina/Buenos_Aires', year: 'numeric', month: '2-digit', day: '2-digit' }).split('/').reverse().join('-');
   const argentinaTime = now.toLocaleTimeString('es-AR', { timeZone: 'America/Argentina/Buenos_Aires', hour: '2-digit', minute: '2-digit' });
 
   const systemInstruction = `
     You are an expert accountant assistant for the Argentine tax system (ARCA/AFIP).
-    Current Date Context: ${argentinaDate} (DD/MM/YYYY).
+    Current Date Context: ${argentinaDate} (YYYY-MM-DD).
     Current Time Context: ${argentinaTime}.
 
-    Your goal is to extract invoice details from natural language text or voice transcripts.
+    Extract invoice details from natural language text or voice transcripts.
     
     Defaults if not specified:
     - Type: Factura C
     - Concept: Productos
     - Payment: Contado
     - POS: 1
-    - Date: ${new Date().toISOString().split('T')[0]} (ISO Format YYYY-MM-DD)
+    - Date: ${argentinaDate}
     - Time: ${argentinaTime}
 
-    Extract items, quantities, and prices.
+    Return JSON.
   `;
 
   try {

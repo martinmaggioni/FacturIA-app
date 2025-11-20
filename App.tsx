@@ -4,7 +4,7 @@ import { parseInvoiceRequest } from './services/geminiService';
 import { speak } from './services/ttsService';
 import VoiceInput from './components/VoiceInput';
 import InvoiceReview from './components/InvoiceReview';
-import { LogOut, CheckCircle, Clock, Volume2, VolumeX, AlertTriangle, BrainCircuit, Settings, Key, FileKey, Server, Upload, Download, FileJson, Info } from 'lucide-react';
+import { LogOut, CheckCircle, Clock, Volume2, VolumeX, AlertTriangle, BrainCircuit, Settings, Key, FileKey, Server, Upload, Download, FileJson, Info, Wifi, WifiOff, RefreshCw } from 'lucide-react';
 
 const App: React.FC = () => {
   // --- Configuración Persistente ---
@@ -23,6 +23,8 @@ const App: React.FC = () => {
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [audioEnabled, setAudioEnabled] = useState(true);
+  const [isTestingConnection, setIsTestingConnection] = useState(false);
+  const [connectionStatus, setConnectionStatus] = useState<'unknown' | 'success' | 'error'>('unknown');
   
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -48,12 +50,38 @@ const App: React.FC = () => {
   };
 
   const saveSettings = () => {
+    // Limpiar espacios en blanco comunes al copiar/pegar certificados
+    const cleanCert = cert.trim();
+    const cleanKey = key.trim();
+    
+    setCert(cleanCert);
+    setKey(cleanKey);
+
     localStorage.setItem('facturia_server_url', serverUrl);
     localStorage.setItem('facturia_cuit', cuit);
-    localStorage.setItem('facturia_cert', cert);
-    localStorage.setItem('facturia_key', key);
+    localStorage.setItem('facturia_cert', cleanCert);
+    localStorage.setItem('facturia_key', cleanKey);
     setShowSettings(false);
-    playAudio("Configuración guardada correctamente.");
+    playAudio("Configuración guardada.");
+  };
+
+  const testConnection = async () => {
+    setIsTestingConnection(true);
+    setConnectionStatus('unknown');
+    try {
+        const res = await fetch(`${serverUrl}/`, { method: 'GET' });
+        if (res.ok) {
+            setConnectionStatus('success');
+            playAudio("Conexión exitosa con el servidor.");
+        } else {
+            throw new Error("Server error");
+        }
+    } catch (error) {
+        setConnectionStatus('error');
+        playAudio("No se pudo conectar al servidor.");
+    } finally {
+        setIsTestingConnection(false);
+    }
   };
 
   const handleExportProfile = () => {
@@ -70,7 +98,7 @@ const App: React.FC = () => {
     link.download = `facturia_perfil_${cuit || 'sin_cuit'}.json`;
     link.href = url;
     link.click();
-    playAudio("Perfil exportado. Envíalo a tu otro dispositivo.");
+    playAudio("Perfil exportado.");
   };
 
   const handleImportProfile = (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -88,10 +116,10 @@ const App: React.FC = () => {
         if (parsed.cert) setCert(parsed.cert);
         if (parsed.key) setKey(parsed.key);
         
-        playAudio("Perfil importado exitosamente. Revisa los datos.");
+        playAudio("Perfil importado correctamente.");
       } catch (error) {
-        setErrorMessage("Error al leer el archivo de perfil.");
-        playAudio("El archivo no es válido.");
+        setErrorMessage("Error al leer el archivo.");
+        playAudio("Archivo inválido.");
       }
     };
     reader.readAsText(file);
@@ -101,8 +129,6 @@ const App: React.FC = () => {
 
   const handleLogin = (e: React.FormEvent) => {
     e.preventDefault();
-    // Validación simple: Requiere al menos CUIT para entrar al dashboard
-    // En un caso real validaríamos contra el servidor, pero aquí asumimos que si tiene datos, puede intentar.
     if (cuit && cert && key) {
       const userData: UserProfile = {
         cuit,
@@ -114,11 +140,11 @@ const App: React.FC = () => {
       setUser(userData);
       
       setTimeout(() => {
-        playAudio(`Bienvenido a Facturía. Conectado al servidor.`);
+        playAudio(`Bienvenido.`);
       }, 500);
     } else {
         setShowSettings(true);
-        playAudio("Por favor configura tus credenciales de ARCA primero.");
+        playAudio("Configura tus datos primero.");
     }
   };
 
@@ -130,11 +156,11 @@ const App: React.FC = () => {
     try {
       const data = await parseInvoiceRequest(text);
       const completeData: InvoiceData = {
-        posNumber: 1,
+        posNumber: 1, // Default POS, can be changed in review
         ...data
       };
       setInvoiceDraft(completeData);
-      playAudio("Borrador generado. Revisa los detalles.");
+      playAudio("Borrador generado.");
     } catch (error) {
       const errorMsg = "No entendí la solicitud. Intenta de nuevo.";
       setErrorMessage(errorMsg);
@@ -156,8 +182,6 @@ const App: React.FC = () => {
     setErrorMessage(null);
     
     try {
-        // ENVIAMOS LA FACTURA + LAS CREDENCIALES
-        // El servidor no guarda nada, usa las credenciales solo para esta operación (Stateless)
         const payload = {
             auth: {
                 cuit: user.cuit,
@@ -174,7 +198,6 @@ const App: React.FC = () => {
         });
 
         if (!response.ok) {
-            // Intentar leer el error del JSON
             let errText = response.statusText;
             try {
                 const errJson = await response.json();
@@ -188,7 +211,7 @@ const App: React.FC = () => {
         if (result.success) {
              let msg = `¡Éxito! CAE: ${result.cae}`;
              setSuccessMessage(msg);
-             playAudio("Comprobante autorizado exitosamente.");
+             playAudio("Comprobante autorizado.");
              setInvoiceDraft(null);
              setTimeout(() => setSuccessMessage(null), 8000);
         } else {
@@ -197,9 +220,9 @@ const App: React.FC = () => {
 
     } catch (error: any) {
         console.error(error);
-        const msg = `Error: ${error.message}. Revisa la IP del servidor o tus certificados.`;
+        const msg = `Error: ${error.message}`;
         setErrorMessage(msg);
-        playAudio("Error al conectar con el servidor.");
+        playAudio("Hubo un error al enviar el comprobante.");
     } finally {
         setIsProcessing(false);
     }
@@ -208,46 +231,37 @@ const App: React.FC = () => {
   // --- RENDER: PANTALLA DE CONFIGURACIÓN ---
   if (showSettings) {
       return (
-        <div className="min-h-screen bg-gray-100 p-4 flex items-center justify-center">
-            <div className="bg-white rounded-3xl shadow-xl max-w-lg w-full p-6 animate-fade-in-up">
-                <div className="flex justify-between items-center mb-6">
+        <div className="min-h-screen bg-gray-100 p-4 flex items-center justify-center fixed inset-0 z-50">
+            <div className="bg-white rounded-3xl shadow-xl max-w-lg w-full p-6 animate-fade-in-up max-h-[90vh] flex flex-col">
+                <div className="flex justify-between items-center mb-4">
                     <h2 className="text-2xl font-bold text-gray-900 flex items-center gap-2">
                         <Settings className="w-6 h-6" /> Configuración
                     </h2>
-                    <button onClick={() => setShowSettings(false)} className="text-gray-500 hover:text-black">Cerrar</button>
+                    <button onClick={() => setShowSettings(false)} className="text-gray-500 hover:text-black font-medium">Cerrar</button>
                 </div>
 
-                {/* Export/Import Tools */}
-                <div className="flex gap-3 mb-6">
-                   <button 
-                     onClick={handleExportProfile}
-                     className="flex-1 bg-gray-100 hover:bg-gray-200 text-gray-700 py-2 px-3 rounded-xl flex items-center justify-center gap-2 text-xs font-bold transition-colors"
-                   >
-                      <Download className="w-4 h-4" /> Exportar Perfil
-                   </button>
-                   <button 
-                     onClick={() => fileInputRef.current?.click()}
-                     className="flex-1 bg-gray-100 hover:bg-gray-200 text-gray-700 py-2 px-3 rounded-xl flex items-center justify-center gap-2 text-xs font-bold transition-colors"
-                   >
-                      <Upload className="w-4 h-4" /> Importar Perfil
-                   </button>
-                   <input 
-                        type="file" 
-                        ref={fileInputRef} 
-                        className="hidden" 
-                        accept=".json" 
-                        onChange={handleImportProfile}
-                   />
-                </div>
-                
-                <div className="space-y-4 max-h-[60vh] overflow-y-auto pr-2">
-                    
-                    <div className="bg-blue-50 p-3 rounded-xl flex gap-3 border border-blue-100">
-                        <Info className="w-5 h-5 text-blue-500 flex-shrink-0" />
-                        <p className="text-xs text-blue-800">
-                            <strong>¿Misma cuenta, varios dispositivos?</strong>
-                            <br/>Si tu papá y tú facturan para el mismo negocio, usen el botón "Exportar Perfil" para compartir las credenciales. Ambos deben tener cargados los <strong>mismos</strong> archivos .crt y .key.
-                        </p>
+                <div className="overflow-y-auto pr-2 flex-grow space-y-5">
+                    {/* Export/Import Tools */}
+                    <div className="flex gap-2">
+                       <button 
+                         onClick={handleExportProfile}
+                         className="flex-1 bg-gray-100 hover:bg-gray-200 text-gray-700 py-2 px-2 rounded-xl flex items-center justify-center gap-2 text-xs font-bold"
+                       >
+                          <Download className="w-4 h-4" /> Exportar
+                       </button>
+                       <button 
+                         onClick={() => fileInputRef.current?.click()}
+                         className="flex-1 bg-gray-100 hover:bg-gray-200 text-gray-700 py-2 px-2 rounded-xl flex items-center justify-center gap-2 text-xs font-bold"
+                       >
+                          <Upload className="w-4 h-4" /> Importar
+                       </button>
+                       <input 
+                            type="file" 
+                            ref={fileInputRef} 
+                            className="hidden" 
+                            accept=".json" 
+                            onChange={handleImportProfile}
+                       />
                     </div>
 
                     <div>
@@ -259,10 +273,32 @@ const App: React.FC = () => {
                                 value={serverUrl}
                                 onChange={(e) => setServerUrl(e.target.value)}
                                 className="w-full bg-transparent border-none outline-none text-sm"
-                                placeholder="http://192.168.1.X:3001"
+                                placeholder="https://..."
                             />
                         </div>
-                        <p className="text-[10px] text-gray-400 mt-1">Usa la IP de tu PC (si estás en casa) o la URL de Render (si estás fuera).</p>
+                        
+                        {/* Botón Probar Conexión Nuevo */}
+                        <button 
+                            onClick={testConnection}
+                            disabled={isTestingConnection}
+                            className={`mt-2 w-full py-2 rounded-lg text-xs font-bold flex items-center justify-center gap-2 transition-colors ${
+                                connectionStatus === 'success' ? 'bg-green-100 text-green-700' :
+                                connectionStatus === 'error' ? 'bg-red-100 text-red-700' :
+                                'bg-blue-50 text-blue-700 hover:bg-blue-100'
+                            }`}
+                        >
+                            {isTestingConnection ? (
+                                <RefreshCw className="w-3 h-3 animate-spin" />
+                            ) : connectionStatus === 'success' ? (
+                                <Wifi className="w-3 h-3" />
+                            ) : (
+                                <WifiOff className="w-3 h-3" />
+                            )}
+                            {isTestingConnection ? 'Conectando...' : 
+                             connectionStatus === 'success' ? 'Conexión Exitosa' : 
+                             connectionStatus === 'error' ? 'Falló la conexión (Reintentar)' : 
+                             'Probar Conexión'}
+                        </button>
                     </div>
 
                     <div>
@@ -270,7 +306,7 @@ const App: React.FC = () => {
                         <div className="flex items-center gap-2 bg-gray-50 rounded-xl px-3 py-2 border border-gray-200">
                             <Key className="w-5 h-5 text-gray-400" />
                             <input 
-                                type="text" 
+                                type="number" 
                                 value={cuit}
                                 onChange={(e) => setCuit(e.target.value)}
                                 className="w-full bg-transparent border-none outline-none text-sm"
@@ -282,15 +318,11 @@ const App: React.FC = () => {
                     <div>
                         <label className="block text-xs font-bold uppercase text-gray-500 mb-1">Certificado (.crt)</label>
                         <div className="bg-gray-50 rounded-xl px-3 py-2 border border-gray-200">
-                            <div className="flex items-center gap-2 mb-2 border-b border-gray-200 pb-1">
-                                <FileKey className="w-4 h-4 text-blue-500" />
-                                <span className="text-xs text-gray-400">Debe corresponder al CUIT de arriba</span>
-                            </div>
                             <textarea 
                                 value={cert}
                                 onChange={(e) => setCert(e.target.value)}
                                 className="w-full bg-transparent border-none outline-none text-xs font-mono h-20 resize-none"
-                                placeholder="-----BEGIN CERTIFICATE----- ..."
+                                placeholder="Copiar contenido de .crt"
                             />
                         </div>
                     </div>
@@ -298,15 +330,11 @@ const App: React.FC = () => {
                     <div>
                         <label className="block text-xs font-bold uppercase text-gray-500 mb-1">Clave Privada (.key)</label>
                         <div className="bg-gray-50 rounded-xl px-3 py-2 border border-gray-200">
-                            <div className="flex items-center gap-2 mb-2 border-b border-gray-200 pb-1">
-                                <FileKey className="w-4 h-4 text-red-500" />
-                                <span className="text-xs text-gray-400">Debe corresponder al CUIT de arriba</span>
-                            </div>
                             <textarea 
                                 value={key}
                                 onChange={(e) => setKey(e.target.value)}
                                 className="w-full bg-transparent border-none outline-none text-xs font-mono h-20 resize-none"
-                                placeholder="-----BEGIN PRIVATE KEY----- ..."
+                                placeholder="Copiar contenido de .key"
                             />
                         </div>
                     </div>
@@ -314,9 +342,9 @@ const App: React.FC = () => {
 
                 <button 
                     onClick={saveSettings}
-                    className="w-full mt-6 bg-black text-white font-bold py-3 rounded-xl hover:bg-gray-800 transition-all"
+                    className="w-full mt-4 bg-black text-white font-bold py-3 rounded-xl hover:bg-gray-800 transition-all"
                 >
-                    Guardar Configuración
+                    Guardar Cambios
                 </button>
             </div>
         </div>
@@ -334,22 +362,18 @@ const App: React.FC = () => {
              </div>
           </div>
           <h1 className="text-3xl font-bold text-center text-gray-900 mb-1">FacturIA</h1>
-          <p className="text-center text-gray-500 mb-8 text-sm">Inteligencia Artificial para ARCA</p>
           
-          <form onSubmit={handleLogin} className="space-y-4">
+          <form onSubmit={handleLogin} className="space-y-4 mt-6">
             {cuit ? (
                 <>
                     <div className="p-4 bg-gray-50 rounded-xl border border-gray-200 text-center">
-                        <p className="text-xs text-gray-400 uppercase font-bold mb-1">Ingresar como</p>
+                        <p className="text-xs text-gray-400 uppercase font-bold mb-1">Cuenta</p>
                         <p className="text-xl font-bold text-gray-800">{cuit}</p>
-                        <p className="text-xs text-green-600 font-medium mt-1 flex justify-center items-center gap-1">
-                            <CheckCircle className="w-3 h-3" /> Credenciales cargadas
-                        </p>
                     </div>
                     
                     <button 
                       type="submit"
-                      className="w-full bg-black text-white font-bold py-3.5 rounded-xl hover:bg-gray-800 transition-transform transform active:scale-95 shadow-lg mt-4"
+                      className="w-full bg-black text-white font-bold py-3.5 rounded-xl hover:bg-gray-800 shadow-lg mt-2"
                     >
                       Ingresar
                     </button>
@@ -357,34 +381,29 @@ const App: React.FC = () => {
                      <button 
                       type="button"
                       onClick={() => setShowSettings(true)}
-                      className="w-full bg-white text-gray-600 font-medium py-2 rounded-xl hover:bg-gray-50 border border-gray-200 flex items-center justify-center gap-2"
+                      className="w-full bg-white text-gray-600 font-medium py-2 rounded-xl hover:bg-gray-50 border border-gray-200 mt-2"
                     >
-                      <Settings className="w-4 h-4" /> Modificar Datos
+                      Modificar Datos
                     </button>
                 </>
             ) : (
                 <>
-                    <div className="p-4 bg-blue-50 rounded-xl border border-blue-100 text-center text-blue-800 text-sm">
-                        <p>Bienvenido. Para comenzar, configura tu CUIT y Certificados.</p>
-                    </div>
-
                     <button 
                       type="button"
                       onClick={() => setShowSettings(true)}
-                      className="w-full bg-black text-white font-bold py-3.5 rounded-xl hover:bg-gray-800 transition-transform transform active:scale-95 shadow-lg mt-4"
+                      className="w-full bg-black text-white font-bold py-3.5 rounded-xl hover:bg-gray-800 shadow-lg"
                     >
                       Comenzar Configuración
                     </button>
                 </>
             )}
             
-            <p className="text-center text-gray-400 text-xs mt-4 font-medium">Aplicación desarrollada por Martin-M</p>
+            <p className="text-center text-gray-400 text-xs mt-6 font-medium">Desarrollado por Martin-M</p>
           </form>
         </div>
         
-        {/* Footer Fixed Bottom */}
         <div className="absolute bottom-6 text-center w-full">
-            <p className="text-xs text-gray-400 font-medium tracking-wide">
+            <p className="text-[10px] text-gray-300 uppercase tracking-widest">
                 Galvez-Santa Fe ARG
             </p>
         </div>
@@ -403,29 +422,21 @@ const App: React.FC = () => {
                 <BrainCircuit className="text-white w-5 h-5" />
             </div>
             <div>
-                <h1 className="text-lg font-bold leading-tight tracking-tight">FacturIA</h1>
-                <p className="text-xs text-gray-500 leading-none">CUIT {user.cuit}</p>
+                <h1 className="text-lg font-bold leading-tight">FacturIA</h1>
             </div>
           </div>
           <div className="flex items-center gap-2">
             <button
                 onClick={() => setAudioEnabled(!audioEnabled)}
-                className="p-2 rounded-full hover:bg-gray-100 transition-colors text-gray-500"
-                title={audioEnabled ? "Silenciar voz" : "Activar voz"}
+                className="p-2 rounded-full hover:bg-gray-100 text-gray-500"
             >
                 {audioEnabled ? <Volume2 className="w-5 h-5" /> : <VolumeX className="w-5 h-5" />}
             </button>
             <button 
                 onClick={() => setShowSettings(true)}
-                className="p-2 rounded-full hover:bg-gray-100 transition-colors text-gray-500"
+                className="p-2 rounded-full hover:bg-gray-100 text-gray-500"
             >
                 <Settings className="w-5 h-5" />
-            </button>
-            <button 
-                onClick={() => setUser(null)}
-                className="p-2 rounded-full hover:bg-gray-100 transition-colors"
-            >
-                <LogOut className="w-5 h-5 text-gray-600" />
             </button>
           </div>
         </div>
@@ -433,22 +444,20 @@ const App: React.FC = () => {
 
       <main className="max-w-2xl mx-auto px-4 py-8 flex-grow w-full">
         
-        {/* Messages */}
         {successMessage && (
-          <div className="mb-6 p-4 bg-green-100 border border-green-200 text-green-800 rounded-2xl flex items-center gap-3 animate-fade-in-down shadow-sm">
-            <CheckCircle className="w-6 h-6 text-green-600" />
-            <span className="font-medium">{successMessage}</span>
+          <div className="mb-6 p-4 bg-green-100 border border-green-200 text-green-800 rounded-2xl flex items-center gap-3 shadow-sm animate-fade-in-down">
+            <CheckCircle className="w-6 h-6" />
+            <span className="font-medium text-sm">{successMessage}</span>
           </div>
         )}
 
         {errorMessage && (
-          <div className="mb-6 p-4 bg-red-50 border border-red-200 text-red-800 rounded-2xl flex items-center gap-3 animate-fade-in-down shadow-sm">
-            <AlertTriangle className="w-6 h-6 text-red-600" />
-            <span className="font-medium">{errorMessage}</span>
+          <div className="mb-6 p-4 bg-red-50 border border-red-200 text-red-800 rounded-2xl flex items-center gap-3 shadow-sm animate-fade-in-down">
+            <AlertTriangle className="w-6 h-6" />
+            <span className="font-medium text-sm">{errorMessage}</span>
           </div>
         )}
 
-        {/* Content */}
         {invoiceDraft ? (
           <InvoiceReview 
             data={invoiceDraft}
@@ -459,71 +468,38 @@ const App: React.FC = () => {
           />
         ) : (
           <>
-            <div className="text-center mb-10 mt-6">
-               <h2 className="text-3xl font-bold text-gray-900 mb-3 tracking-tight">Hola, ¿qué facturamos?</h2>
-               <p className="text-gray-500 max-w-md mx-auto">
-                 Usa tu voz o escribe los detalles. <br/>
-                 <span className="italic text-gray-400 text-sm">Ej: "Factura C por 2 consultorías a 15000 pesos."</span>
+            <div className="text-center mb-8 mt-4">
+               <h2 className="text-2xl font-bold text-gray-900 mb-2">¿Qué facturamos hoy?</h2>
+               <p className="text-gray-500 text-sm">
+                 Habla o escribe para generar el comprobante.
                </p>
             </div>
 
-            <div className="bg-white rounded-3xl p-6 shadow-xl shadow-gray-100/50 mb-8 border border-white">
+            <div className="bg-white rounded-3xl p-6 shadow-xl shadow-gray-100/50 mb-8">
                 <VoiceInput onTranscript={handleVoiceTranscript} isProcessing={isProcessing} />
-                <div className="relative mt-4 mb-4">
-                    <div className="absolute inset-0 flex items-center">
-                        <div className="w-full border-t border-gray-100"></div>
-                    </div>
-                    <div className="relative flex justify-center text-xs uppercase tracking-wider font-semibold">
-                        <span className="px-2 bg-white text-gray-300">Entrada Manual</span>
-                    </div>
-                </div>
-                <div className="flex gap-2">
+                
+                <div className="mt-6 flex gap-2">
                     <input 
                         type="text"
                         value={inputText}
                         onChange={(e) => setInputText(e.target.value)}
                         onKeyDown={(e) => e.key === 'Enter' && processRequest(inputText)}
-                        placeholder="Escribe los detalles aquí..."
-                        className="flex-grow bg-gray-50 border-none rounded-xl px-4 py-3 focus:ring-2 focus:ring-black outline-none transition-all placeholder-gray-400 font-medium"
+                        placeholder="Ej: Factura C por..."
+                        className="flex-grow bg-gray-50 border-none rounded-xl px-4 py-3 focus:ring-2 focus:ring-black outline-none font-medium"
                         disabled={isProcessing}
                     />
                     <button 
                         onClick={() => processRequest(inputText)}
                         disabled={!inputText.trim() || isProcessing}
-                        className="bg-black text-white px-6 py-3 rounded-xl font-bold hover:bg-gray-800 disabled:opacity-50 transition-all"
+                        className="bg-black text-white px-4 py-3 rounded-xl font-bold hover:bg-gray-800 disabled:opacity-50"
                     >
-                        {isProcessing ? '...' : '->'}
+                        Go
                     </button>
-                </div>
-            </div>
-
-            <div className="grid grid-cols-2 gap-4">
-                <div className="bg-white p-5 rounded-2xl shadow-sm border border-gray-100">
-                    <div className="flex items-center gap-2 mb-2">
-                        <Clock className="w-4 h-4 text-blue-500" />
-                        <span className="text-xs font-bold text-gray-400 uppercase tracking-wider">Pendientes</span>
-                    </div>
-                    <p className="text-3xl font-bold text-gray-900 tracking-tighter">0</p>
-                    <p className="text-xs text-gray-400 mt-1 font-medium">Facturas programadas</p>
-                </div>
-                 <div className="bg-white p-5 rounded-2xl shadow-sm border border-gray-100">
-                    <div className="flex items-center gap-2 mb-2">
-                        <CheckCircle className="w-4 h-4 text-green-500" />
-                        <span className="text-xs font-bold text-gray-400 uppercase tracking-wider">Hoy</span>
-                    </div>
-                    <p className="text-3xl font-bold text-gray-900 tracking-tighter">-</p>
-                    <p className="text-xs text-gray-400 mt-1 font-medium">Total facturado</p>
                 </div>
             </div>
           </>
         )}
       </main>
-      
-      <footer className="py-6 text-center border-t border-gray-200 mt-auto">
-         <p className="text-xs text-gray-400 font-medium tracking-wide">
-            Desarrollado por Martin-M , Galvez-Santa Fe ARG
-        </p>
-      </footer>
     </div>
   );
 };
