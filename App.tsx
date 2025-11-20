@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { UserProfile, InvoiceData } from './types';
 import { parseInvoiceRequest } from './services/geminiService';
-import { speak } from './services/ttsService';
+import { speak, cancel } from './services/ttsService';
 import VoiceInput from './components/VoiceInput';
 import InvoiceReview from './components/InvoiceReview';
 import { LogOut, CheckCircle, Clock, Volume2, VolumeX, AlertTriangle, BrainCircuit, Settings, Key, FileKey, Server, Upload, Download, FileJson, Info, Wifi, WifiOff, RefreshCw } from 'lucide-react';
@@ -47,6 +47,14 @@ const App: React.FC = () => {
     if (audioEnabled) {
       speak(text);
     }
+  };
+
+  const toggleAudio = () => {
+    if (audioEnabled) {
+      // Si estaba activado y lo vamos a desactivar, callar inmediatamente
+      cancel();
+    }
+    setAudioEnabled(!audioEnabled);
   };
 
   const saveSettings = () => {
@@ -427,7 +435,7 @@ const App: React.FC = () => {
           </div>
           <div className="flex items-center gap-2">
             <button
-                onClick={() => setAudioEnabled(!audioEnabled)}
+                onClick={toggleAudio}
                 className="p-2 rounded-full hover:bg-gray-100 text-gray-500"
             >
                 {audioEnabled ? <Volume2 className="w-5 h-5" /> : <VolumeX className="w-5 h-5" />}

@@ -30,6 +30,12 @@ export const speak = (text: string) => {
   window.speechSynthesis.speak(utterance);
 };
 
+export const cancel = () => {
+  if ('speechSynthesis' in window) {
+    window.speechSynthesis.cancel();
+  }
+};
+
 // Ensure voices are loaded (Chrome/Safari quirks)
 if ('speechSynthesis' in window) {
     window.speechSynthesis.onvoiceschanged = () => {
