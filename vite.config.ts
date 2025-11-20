@@ -17,10 +17,6 @@ export default defineConfig(({ mode }) => {
           changeOrigin: true,
         }
       }
-    },
-    define: {
-      // Prevenir crash si process no está definido en el navegador
-      'process.env': {}
     }
   };
 });

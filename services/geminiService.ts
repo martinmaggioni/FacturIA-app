@@ -1,7 +1,8 @@
 import { GoogleGenAI, Type } from "@google/genai";
 import { InvoiceType, ConceptType, PaymentCondition } from "../types";
 
-const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+// Usar import.meta.env para Vite
+const ai = new GoogleGenAI({ apiKey: import.meta.env.VITE_API_KEY });
 
 export const parseInvoiceRequest = async (prompt: string): Promise<any> => {
   const modelId = "gemini-2.5-flash";
