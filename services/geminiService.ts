@@ -1,14 +1,22 @@
 import { GoogleGenAI, Type } from "@google/genai";
 import { InvoiceType, ConceptType, PaymentCondition } from "../types";
 
-// Usar import.meta.env para Vite
-const ai = new GoogleGenAI({ apiKey: import.meta.env.VITE_API_KEY });
+// Use process.env.API_KEY according to strict coding guidelines
+const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
 
 export const parseInvoiceRequest = async (prompt: string): Promise<any> => {
   const modelId = "gemini-2.5-flash";
 
+  // Obtener fecha actual en Argentina para darle contexto a la IA
+  const now = new Date();
+  const argentinaDate = now.toLocaleDateString('es-AR', { timeZone: 'America/Argentina/Buenos_Aires' });
+  const argentinaTime = now.toLocaleTimeString('es-AR', { timeZone: 'America/Argentina/Buenos_Aires', hour: '2-digit', minute: '2-digit' });
+
   const systemInstruction = `
     You are an expert accountant assistant for the Argentine tax system (ARCA/AFIP).
+    Current Date Context: ${argentinaDate} (DD/MM/YYYY).
+    Current Time Context: ${argentinaTime}.
+
     Your goal is to extract invoice details from natural language text or voice transcripts.
     
     Defaults if not specified:
@@ -16,7 +24,8 @@ export const parseInvoiceRequest = async (prompt: string): Promise<any> => {
     - Concept: Productos
     - Payment: Contado
     - POS: 1
-    - Date: Today (YYYY-MM-DD)
+    - Date: ${new Date().toISOString().split('T')[0]} (ISO Format YYYY-MM-DD)
+    - Time: ${argentinaTime}
 
     Extract items, quantities, and prices.
   `;
@@ -35,6 +44,7 @@ export const parseInvoiceRequest = async (prompt: string): Promise<any> => {
             concept: { type: Type.STRING, enum: Object.values(ConceptType) },
             paymentCondition: { type: Type.STRING, enum: Object.values(PaymentCondition) },
             date: { type: Type.STRING, description: "ISO 8601 format YYYY-MM-DD" },
+            time: { type: Type.STRING, description: "Format HH:MM (24h)" },
             scheduledFor: { type: Type.STRING, description: "ISO 8601 format YYYY-MM-DD", nullable: true },
             items: {
               type: Type.ARRAY,

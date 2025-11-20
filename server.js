@@ -93,7 +93,21 @@ app.post('/api/create-invoice', async (req, res) => {
         // Calcular total
         const totalAmount = invoice.items.reduce((acc, item) => acc + (item.quantity * item.unitPrice), 0);
         
-        const formattedDate = parseInt(new Date().toISOString().slice(0,10).replace(/-/g, '')); 
+        // FORMATO FECHA AFIP: YYYYMMDD
+        // Si el usuario eligió una fecha (programada o actual), usamos esa.
+        let invoiceDateInt;
+        if (invoice.date) {
+             invoiceDateInt = parseInt(invoice.date.replace(/-/g, ''));
+        } else {
+             // Fallback a hoy
+             invoiceDateInt = parseInt(new Date().toISOString().slice(0,10).replace(/-/g, ''));
+        }
+
+        // Validacion básica de fechas futuras vs concepto
+        const todayInt = parseInt(new Date().toISOString().slice(0,10).replace(/-/g, ''));
+        if (concepto === 1 && invoiceDateInt > todayInt) {
+             throw new Error("AFIP rechaza facturas de 'Productos' con fecha futura. Cambia el concepto a 'Servicios' o usa la fecha de hoy.");
+        }
 
         let data = {
             'CantReg': 1,
@@ -104,7 +118,7 @@ app.post('/api/create-invoice', async (req, res) => {
             'DocNro': 0,   
             'CbteDesde': nextVoucher,
             'CbteHasta': nextVoucher,
-            'CbteFch': formattedDate,
+            'CbteFch': invoiceDateInt,
             'ImpTotal': totalAmount,
             'ImpTotConc': 0,
             'ImpNeto': totalAmount,
@@ -116,10 +130,12 @@ app.post('/api/create-invoice', async (req, res) => {
         };
 
         if (concepto === 2 || concepto === 3) {
-            data.FchServDesde = formattedDate;
-            data.FchServHasta = formattedDate;
-            data.FchVtoPago = formattedDate;
+            data.FchServDesde = invoiceDateInt;
+            data.FchServHasta = invoiceDateInt;
+            data.FchVtoPago = invoiceDateInt;
         }
+
+        console.log("Enviando a AFIP:", data);
 
         const response = await afip.ElectronicBilling.createVoucher(data);
         console.log("✅ Comprobante creado con éxito:", response.CAE);
@@ -132,10 +148,17 @@ app.post('/api/create-invoice', async (req, res) => {
         });
 
     } catch (error) {
-        console.error("❌ Error:", error.message);
+        console.error("❌ Error en Backend:", error);
+        let errorMessage = error.message || "Error interno del servidor";
+        
+        // Intentar capturar errores específicos de AFIP (Soap Faults)
+        if (error.message && error.message.includes('soap:Fault')) {
+             errorMessage = "Rechazo de AFIP: Revisa fechas o montos.";
+        }
+
         res.status(500).json({
             success: false,
-            message: error.message || "Error interno del servidor"
+            message: errorMessage
         });
     } finally {
         // Limpieza

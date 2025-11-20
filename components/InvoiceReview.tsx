@@ -1,6 +1,6 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { InvoiceData, LineItem, InvoiceType, PaymentCondition } from '../types';
-import { Calendar, CreditCard, Edit2, Plus, Trash2 } from 'lucide-react';
+import { Calendar, Clock, Edit2, Plus, Trash2 } from 'lucide-react';
 
 interface InvoiceReviewProps {
   data: InvoiceData;
@@ -11,6 +11,21 @@ interface InvoiceReviewProps {
 }
 
 const InvoiceReview: React.FC<InvoiceReviewProps> = ({ data, onUpdate, onConfirm, onCancel, isLoading }) => {
+
+  // Al montar, asegurar que haya fecha y hora por defecto (Argentina)
+  useEffect(() => {
+    if (!data.date || !data.time) {
+        const now = new Date();
+        const argentinaDate = now.toLocaleDateString('es-AR', { timeZone: 'America/Argentina/Buenos_Aires', year: 'numeric', month: '2-digit', day: '2-digit' }).split('/').reverse().join('-');
+        const argentinaTime = now.toLocaleTimeString('es-AR', { timeZone: 'America/Argentina/Buenos_Aires', hour: '2-digit', minute: '2-digit' });
+        
+        onUpdate({
+            ...data,
+            date: data.date || argentinaDate,
+            time: data.time || argentinaTime
+        });
+    }
+  }, []);
 
   const formatCurrency = (val: number) => {
     return new Intl.NumberFormat('es-AR', { style: 'currency', currency: 'ARS' }).format(val);
@@ -38,7 +53,7 @@ const InvoiceReview: React.FC<InvoiceReviewProps> = ({ data, onUpdate, onConfirm
   };
 
   return (
-    <div className="bg-white rounded-3xl shadow-xl p-6 max-w-2xl w-full mx-auto animate-fade-in-up">
+    <div className="bg-white rounded-3xl shadow-xl p-6 max-w-2xl w-full mx-auto animate-fade-in-up pb-24">
       <div className="flex justify-between items-center mb-6 border-b pb-4 border-gray-100">
         <h2 className="text-2xl font-bold text-gray-800">Revisar Comprobante</h2>
         <span className="px-3 py-1 bg-blue-100 text-blue-700 text-xs font-bold rounded-full uppercase tracking-wide">
@@ -71,32 +86,44 @@ const InvoiceReview: React.FC<InvoiceReviewProps> = ({ data, onUpdate, onConfirm
             </div>
         </div>
 
-        {/* Date & Schedule */}
+        {/* Date & Time */}
         <div className="space-y-4">
-             <div>
-                <label className="block text-xs font-medium text-gray-500 mb-1 uppercase">Fecha Emisión</label>
-                <div className="relative">
-                    <Calendar className="absolute left-3 top-2.5 w-4 h-4 text-gray-400" />
-                    <input 
-                        type="date" 
-                        value={data.date}
-                        onChange={(e) => onUpdate({...data, date: e.target.value})}
-                        className="w-full bg-gray-50 border-none rounded-xl pl-10 pr-4 py-2 text-gray-800 font-medium focus:ring-2 focus:ring-blue-500"
-                    />
-                </div>
-            </div>
-            <div>
-                <label className="block text-xs font-medium text-gray-500 mb-1 uppercase">Programar publicación (Opcional)</label>
-                <div className="relative">
-                    <Calendar className="absolute left-3 top-2.5 w-4 h-4 text-blue-400" />
-                    <input 
-                        type="date" 
-                        value={data.scheduledFor || ''}
-                        onChange={(e) => onUpdate({...data, scheduledFor: e.target.value || undefined})}
-                        className="w-full bg-blue-50 border border-blue-100 rounded-xl pl-10 pr-4 py-2 text-blue-800 font-medium focus:ring-2 focus:ring-blue-500 placeholder-blue-300"
-                    />
-                </div>
-            </div>
+             <div className="flex gap-3">
+                 <div className="flex-grow">
+                    <label className="block text-xs font-medium text-gray-500 mb-1 uppercase">Fecha</label>
+                    <div className="relative">
+                        <Calendar className="absolute left-3 top-2.5 w-4 h-4 text-gray-400" />
+                        <input 
+                            type="date" 
+                            value={data.date}
+                            onChange={(e) => onUpdate({...data, date: e.target.value})}
+                            className="w-full bg-gray-50 border-none rounded-xl pl-10 pr-2 py-2 text-gray-800 font-medium focus:ring-2 focus:ring-blue-500 text-sm"
+                        />
+                    </div>
+                 </div>
+                 <div className="w-1/3">
+                    <label className="block text-xs font-medium text-gray-500 mb-1 uppercase">Hora</label>
+                    <div className="relative">
+                        <Clock className="absolute left-3 top-2.5 w-4 h-4 text-gray-400" />
+                        <input 
+                            type="time" 
+                            value={data.time || ''}
+                            onChange={(e) => onUpdate({...data, time: e.target.value})}
+                            className="w-full bg-gray-50 border-none rounded-xl pl-9 pr-2 py-2 text-gray-800 font-medium focus:ring-2 focus:ring-blue-500 text-sm"
+                        />
+                    </div>
+                 </div>
+             </div>
+             
+            {/* Nota sobre programación */}
+            {data.scheduledFor && (
+                 <div className="p-3 bg-blue-50 rounded-xl border border-blue-100">
+                    <p className="text-xs text-blue-800">
+                       <strong>Programado:</strong> Esta factura se generará con fecha {data.scheduledFor}.
+                       <br/><span className="text-[10px] opacity-75">*Solo válido para servicios o productos dentro del rango permitido por AFIP.</span>
+                    </p>
+                 </div>
+            )}
         </div>
       </div>
 
@@ -113,29 +140,31 @@ const InvoiceReview: React.FC<InvoiceReviewProps> = ({ data, onUpdate, onConfirm
                         type="text" 
                         value={item.name} 
                         onChange={(e) => handleItemChange(idx, 'name', e.target.value)}
-                        className="flex-grow bg-transparent border-none focus:ring-0 font-medium text-gray-800 placeholder-gray-400"
+                        className="flex-grow bg-transparent border-none focus:ring-0 font-medium text-gray-800 placeholder-gray-400 w-full"
                         placeholder="Producto"
                     />
-                    <div className="flex items-center gap-2">
-                        <input 
-                            type="number" 
-                            value={item.quantity} 
-                            onChange={(e) => handleItemChange(idx, 'quantity', parseFloat(e.target.value))}
-                            className="w-16 bg-gray-50 rounded-lg px-2 py-1 text-center text-sm font-semibold"
-                            placeholder="Cant"
-                        />
-                        <span className="text-gray-400">x</span>
-                        <input 
-                            type="number" 
-                            value={item.unitPrice} 
-                            onChange={(e) => handleItemChange(idx, 'unitPrice', parseFloat(e.target.value))}
-                            className="w-24 bg-gray-50 rounded-lg px-2 py-1 text-right text-sm font-semibold"
-                            placeholder="Precio"
-                        />
+                    <div className="flex items-center gap-2 w-full sm:w-auto justify-between sm:justify-start">
+                        <div className="flex items-center gap-1">
+                            <input 
+                                type="number" 
+                                value={item.quantity} 
+                                onChange={(e) => handleItemChange(idx, 'quantity', parseFloat(e.target.value))}
+                                className="w-14 bg-gray-50 rounded-lg px-1 py-1 text-center text-sm font-semibold"
+                                placeholder="Cant"
+                            />
+                            <span className="text-gray-400 text-xs">x</span>
+                            <input 
+                                type="number" 
+                                value={item.unitPrice} 
+                                onChange={(e) => handleItemChange(idx, 'unitPrice', parseFloat(e.target.value))}
+                                className="w-20 bg-gray-50 rounded-lg px-1 py-1 text-right text-sm font-semibold"
+                                placeholder="Price"
+                            />
+                        </div>
+                        <button onClick={() => handleDeleteItem(idx)} className="p-2 text-red-400 hover:text-red-600">
+                            <Trash2 className="w-4 h-4" />
+                        </button>
                     </div>
-                    <button onClick={() => handleDeleteItem(idx)} className="p-2 text-red-400 hover:text-red-600">
-                        <Trash2 className="w-4 h-4" />
-                    </button>
                 </div>
             ))}
             <button 
@@ -148,14 +177,15 @@ const InvoiceReview: React.FC<InvoiceReviewProps> = ({ data, onUpdate, onConfirm
       </div>
 
       {/* Footer Totals */}
-      <div className="flex flex-col sm:flex-row justify-between items-center pt-4 border-t border-gray-100">
-        <div className="text-2xl font-bold text-gray-900 mb-4 sm:mb-0">
+      <div className="flex flex-col sm:flex-row justify-between items-center pt-4 border-t border-gray-100 gap-4">
+        <div className="text-2xl font-bold text-gray-900">
             Total: <span className="text-blue-600">{formatCurrency(calculateTotal())}</span>
         </div>
         <div className="flex gap-3 w-full sm:w-auto">
             <button 
                 onClick={onCancel}
-                className="flex-1 sm:flex-none px-6 py-3 rounded-xl text-gray-600 font-medium hover:bg-gray-100 transition-colors"
+                disabled={isLoading}
+                className="flex-1 sm:flex-none px-6 py-3 rounded-xl text-gray-600 font-medium hover:bg-gray-100 transition-colors disabled:opacity-50"
             >
                 Cancelar
             </button>
@@ -165,9 +195,12 @@ const InvoiceReview: React.FC<InvoiceReviewProps> = ({ data, onUpdate, onConfirm
                 className="flex-1 sm:flex-none px-8 py-3 rounded-xl bg-black text-white font-medium hover:bg-gray-800 transition-transform transform active:scale-95 shadow-lg flex items-center justify-center gap-2 disabled:opacity-70"
             >
                 {isLoading ? (
-                    <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                    <>
+                        <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                        <span>Enviando...</span>
+                    </>
                 ) : (
-                    data.scheduledFor ? 'Programar' : 'Generar Comprobante'
+                    data.scheduledFor ? 'Programar' : 'Generar'
                 )}
             </button>
         </div>

@@ -26,7 +26,8 @@ export interface LineItem {
 export interface InvoiceData {
   posNumber: number; // Point of Sale
   type: InvoiceType;
-  date: string; // ISO Date
+  date: string; // ISO Date YYYY-MM-DD
+  time?: string; // HH:MM
   concept: ConceptType;
   items: LineItem[];
   paymentCondition: PaymentCondition;
