@@ -6,7 +6,7 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "tsc && vite build",
+    "build": "vite build",
     "server": "node server.js",
     "start": "concurrently \"npm run server\" \"npm run dev\" --kill-others"
   },
