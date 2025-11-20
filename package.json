@@ -8,12 +8,11 @@
     "dev": "vite",
     "build": "tsc && vite build",
     "server": "node server.js",
-    "start": "concurrently \"npm run server\" \"npm run dev\" --kill-others",
-    "tunnel": "ngrok http 3001"
+    "start": "concurrently \"npm run server\" \"npm run dev\" --kill-others"
   },
   "dependencies": {
     "@afipsdk/afip.js": "^0.7.8",
-    "@google/genai": "^0.1.1",
+    "@google/genai": "*",
     "body-parser": "^1.20.2",
     "cors": "^2.8.5",
     "dotenv": "^16.3.1",
