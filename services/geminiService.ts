@@ -6,36 +6,19 @@ const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
 export const parseInvoiceRequest = async (prompt: string): Promise<any> => {
   const modelId = "gemini-2.5-flash";
 
-  // Obtener fecha y hora real del sistema del usuario
-  const now = new Date();
-  
-  // Formato manual YYYY-MM-DD para asegurar consistencia
-  const year = now.getFullYear();
-  const month = String(now.getMonth() + 1).padStart(2, '0');
-  const day = String(now.getDate()).padStart(2, '0');
-  const argentinaDate = `${year}-${month}-${day}`;
-  
-  const argentinaTime = now.toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit', hour12: false });
-
   const systemInstruction = `
     Act as a specialized invoice data extractor for ARCA (Argentina).
     
-    CONTEXT:
-    - Today's Date: ${argentinaDate} (Use this EXACT date unless the user specifies another).
-    - Current Time: ${argentinaTime} (Use this EXACT time unless specified).
-
     CRITICAL RULES FOR EXTRACTION:
     1. ITEM NAMES (KEYWORDS ONLY): 
        - Extract only the core product name. Remove words like "litros de", "botella de", "paquete de", "unidades de".
        - Example Input: "2 litros de lavandina a 800" -> Output: Item: "Lavandina", Qty: 2, Price: 800.
        - Example Input: "una coca cola" -> Output: Item: "Coca Cola", Qty: 1.
     
-    2. DATES:
-       - If the user does not mention a specific date (like "ayer", "mañana", "el 5 de enero"), YOU MUST RETURN "${argentinaDate}".
-       - DO NOT hallucinate dates from 2024 or the past.
-
-    3. TIME:
-       - Always return the time in HH:MM format. Default to "${argentinaTime}".
+    2. DATES AND TIMES:
+       - UNLESS the user explicitly mentions a date (e.g., "con fecha de ayer", "para mañana"), RETURN NULL for date.
+       - DO NOT hallucinate a default date like "2024-05-15". Return NULL so the app can use the system date.
+       - Return NULL for time unless specified.
 
     Defaults:
     - Type: Factura C
@@ -57,8 +40,8 @@ export const parseInvoiceRequest = async (prompt: string): Promise<any> => {
             type: { type: Type.STRING, enum: Object.values(InvoiceType) },
             concept: { type: Type.STRING, enum: Object.values(ConceptType) },
             paymentCondition: { type: Type.STRING, enum: Object.values(PaymentCondition) },
-            date: { type: Type.STRING, description: "ISO 8601 YYYY-MM-DD. Default to Today." },
-            time: { type: Type.STRING, description: "HH:MM (24h)" },
+            date: { type: Type.STRING, description: "ISO 8601 YYYY-MM-DD. Null if not specified.", nullable: true },
+            time: { type: Type.STRING, description: "HH:MM (24h). Null if not specified.", nullable: true },
             scheduledFor: { type: Type.STRING, description: "ISO 8601 YYYY-MM-DD", nullable: true },
             items: {
               type: Type.ARRAY,
@@ -73,20 +56,14 @@ export const parseInvoiceRequest = async (prompt: string): Promise<any> => {
               }
             }
           },
-          required: ["type", "concept", "paymentCondition", "items", "date", "time"]
+          required: ["type", "concept", "paymentCondition", "items"]
         }
       }
     });
 
     if (response.text) {
       const parsed = JSON.parse(response.text);
-      // Doble verificación de seguridad por si la IA alucina la fecha
-      if (!parsed.date || parsed.date.includes('2024-05')) {
-          parsed.date = argentinaDate;
-      }
-      if (!parsed.time) {
-          parsed.time = argentinaTime;
-      }
+      // El frontend se encargará de rellenar la fecha si es null
       return parsed;
     }
     return null;

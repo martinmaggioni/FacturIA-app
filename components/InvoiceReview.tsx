@@ -12,10 +12,9 @@ interface InvoiceReviewProps {
 
 const InvoiceReview: React.FC<InvoiceReviewProps> = ({ data, onUpdate, onConfirm, onCancel, isLoading }) => {
 
-  // Al montar, asegurar que haya fecha y hora por defecto si vinieron vacías
+  // Al montar, corregir fechas viejas y asegurar hora
   useEffect(() => {
     const now = new Date();
-    // Construir manualmente YYYY-MM-DD para evitar problemas de zona horaria
     const year = now.getFullYear();
     const month = String(now.getMonth() + 1).padStart(2, '0');
     const day = String(now.getDate()).padStart(2, '0');
@@ -24,10 +23,14 @@ const InvoiceReview: React.FC<InvoiceReviewProps> = ({ data, onUpdate, onConfirm
 
     let updates: Partial<InvoiceData> = {};
     
-    // Si la fecha viene vacía o parece ser una fecha vieja "default" (ej: 2024), forzar la actual
-    if (!data.date) {
+    // LÓGICA DE CORRECCIÓN DE FECHA:
+    // 1. Si no hay fecha.
+    // 2. Si la fecha es del 2024 (asumimos error de IA, ya que estamos en 2025+).
+    if (!data.date || data.date.startsWith('2024')) {
         updates.date = currentDate;
     }
+    
+    // Si no hay hora, poner la actual
     if (!data.time) {
         updates.time = currentTime;
     }
@@ -71,15 +74,15 @@ const InvoiceReview: React.FC<InvoiceReviewProps> = ({ data, onUpdate, onConfirm
         </span>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
-        {/* Type & Condition */}
-        <div className="space-y-4">
+      <div className="grid grid-cols-1 gap-6 mb-6">
+        {/* Type & Condition Row */}
+        <div className="grid grid-cols-2 gap-4">
             <div>
                 <label className="block text-xs font-medium text-gray-500 mb-1 uppercase">Tipo</label>
                 <select 
                     value={data.type} 
                     onChange={(e) => onUpdate({...data, type: e.target.value as InvoiceType})}
-                    className="w-full bg-gray-50 border-none rounded-xl px-4 py-2 text-gray-800 font-semibold focus:ring-2 focus:ring-blue-500"
+                    className="w-full bg-gray-50 border-none rounded-xl px-3 py-2 text-gray-800 font-semibold focus:ring-2 focus:ring-blue-500 text-sm"
                 >
                     {Object.values(InvoiceType).map(t => <option key={t} value={t}>{t}</option>)}
                 </select>
@@ -89,51 +92,47 @@ const InvoiceReview: React.FC<InvoiceReviewProps> = ({ data, onUpdate, onConfirm
                  <select 
                     value={data.paymentCondition} 
                     onChange={(e) => onUpdate({...data, paymentCondition: e.target.value as PaymentCondition})}
-                    className="w-full bg-gray-50 border-none rounded-xl px-4 py-2 text-gray-800 font-medium focus:ring-2 focus:ring-blue-500"
+                    className="w-full bg-gray-50 border-none rounded-xl px-3 py-2 text-gray-800 font-medium focus:ring-2 focus:ring-blue-500 text-sm"
                 >
                     {Object.values(PaymentCondition).map(t => <option key={t} value={t}>{t}</option>)}
                 </select>
             </div>
         </div>
 
-        {/* Date & Time */}
-        <div className="space-y-4">
-             <div className="flex gap-3">
-                 <div className="flex-grow">
-                    <label className="block text-xs font-medium text-gray-500 mb-1 uppercase">Fecha</label>
-                    <div className="relative">
-                        <Calendar className="absolute left-3 top-2.5 w-4 h-4 text-gray-400" />
-                        <input 
-                            type="date" 
-                            value={data.date}
-                            onChange={(e) => onUpdate({...data, date: e.target.value})}
-                            className="w-full bg-gray-50 border-none rounded-xl pl-10 pr-2 py-2 text-gray-800 font-medium focus:ring-2 focus:ring-blue-500 text-sm"
-                        />
-                    </div>
-                 </div>
-                 <div className="w-[110px]">
-                    <label className="block text-xs font-medium text-gray-500 mb-1 uppercase">Hora</label>
-                    <div className="relative">
-                        <Clock className="absolute left-3 top-2.5 w-4 h-4 text-gray-400" />
-                        <input 
-                            type="time" 
-                            value={data.time || ''}
-                            onChange={(e) => onUpdate({...data, time: e.target.value})}
-                            className="w-full bg-gray-50 border-none rounded-xl pl-9 pr-2 py-2 text-gray-800 font-medium focus:ring-2 focus:ring-blue-500 text-sm"
-                        />
-                    </div>
-                 </div>
+        {/* Date & Time Row (GRID 50/50) */}
+        <div className="grid grid-cols-2 gap-4">
+             <div>
+                <label className="block text-xs font-medium text-gray-500 mb-1 uppercase">Fecha Emisión</label>
+                <div className="relative">
+                    <input 
+                        type="date" 
+                        value={data.date}
+                        onChange={(e) => onUpdate({...data, date: e.target.value})}
+                        className="w-full bg-gray-50 border-none rounded-xl px-3 py-2 text-gray-800 font-medium focus:ring-2 focus:ring-blue-500 text-sm min-h-[42px]"
+                    />
+                </div>
              </div>
-             
-            {/* Nota sobre programación */}
-            {data.scheduledFor && (
-                 <div className="p-3 bg-blue-50 rounded-xl border border-blue-100">
-                    <p className="text-xs text-blue-800">
-                       <strong>Programado:</strong> Esta factura se generará con fecha {data.scheduledFor}.
-                    </p>
-                 </div>
-            )}
+             <div>
+                <label className="block text-xs font-medium text-gray-500 mb-1 uppercase">Hora</label>
+                <div className="relative">
+                    <input 
+                        type="time" 
+                        value={data.time || ''}
+                        onChange={(e) => onUpdate({...data, time: e.target.value})}
+                        className="w-full bg-gray-50 border-none rounded-xl px-3 py-2 text-gray-800 font-medium focus:ring-2 focus:ring-blue-500 text-sm min-h-[42px]"
+                    />
+                </div>
+             </div>
         </div>
+             
+        {/* Programación (Opcional) */}
+        {data.scheduledFor && (
+             <div className="p-3 bg-blue-50 rounded-xl border border-blue-100">
+                <p className="text-xs text-blue-800">
+                   <strong>Programado:</strong> Se generará automáticamente el {data.scheduledFor}.
+                </p>
+             </div>
+        )}
       </div>
 
       {/* Items Table */}
