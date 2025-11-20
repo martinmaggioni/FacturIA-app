@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<html lang="es">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+    <title>FacturIA</title>
+    <meta name="theme-color" content="#F5F5F7" />
+    <link rel="manifest" href="/manifest.json">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <!-- Tailwind CDN for styling fallback -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+      tailwind.config = {
+        theme: {
+          extend: {
+            fontFamily: {
+              sans: ['Inter', 'sans-serif'],
+            },
+            animation: {
+              'fade-in-up': 'fade-in-up 0.5s ease-out forwards',
+              'fade-in-down': 'fade-in-down 0.3s ease-out forwards',
+            },
+            keyframes: {
+              'fade-in-up': {
+                'from': { opacity: '0', transform: 'translateY(20px)' },
+                'to': { opacity: '1', transform: 'translateY(0)' },
+              },
+              'fade-in-down': {
+                'from': { opacity: '0', transform: 'translateY(-10px)' },
+                'to': { opacity: '1', transform: 'translateY(0)' },
+              }
+            }
+          }
+        }
+      }
+    </script>
+    <style>
+      body {
+        font-family: 'Inter', sans-serif;
+        background-color: #F5F5F7;
+      }
+    </style>
+  <script type="importmap">
+{
+  "imports": {
+    "react": "https://aistudiocdn.com/react@^19.2.0",
+    "react-dom/": "https://aistudiocdn.com/react-dom@^19.2.0/",
+    "react/": "https://aistudiocdn.com/react@^19.2.0/",
+    "express": "https://aistudiocdn.com/express@^5.1.0",
+    "cors": "https://aistudiocdn.com/cors@^2.8.5",
+    "body-parser": "https://aistudiocdn.com/body-parser@^2.2.0",
+    "os": "https://aistudiocdn.com/os@^0.1.2",
+    "fs": "https://aistudiocdn.com/fs@^0.0.1-security",
+    "path": "https://aistudiocdn.com/path@^0.12.7",
+    "url": "https://aistudiocdn.com/url@^0.11.4",
+    "module": "https://aistudiocdn.com/module@^2.0.0",
+    "vite": "https://aistudiocdn.com/vite@^7.2.2",
+    "@vitejs/plugin-react": "https://aistudiocdn.com/@vitejs/plugin-react@^5.1.1",
+    "dotenv": "https://aistudiocdn.com/dotenv@^17.2.3",
+    "@google/genai": "https://aistudiocdn.com/@google/genai@^1.30.0",
+    "lucide-react": "https://aistudiocdn.com/lucide-react@^0.554.0"
+  }
+}
+</script>
+<link rel="stylesheet" href="/index.css">
+</head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/index.tsx"></script>
+  </body>
+</html>

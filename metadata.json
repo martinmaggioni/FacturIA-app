@@ -1,0 +1,7 @@
+{
+  "name": "FacturIA",
+  "description": "Automated invoice generation for ARCA using Voice and AI.",
+  "requestFramePermissions": [
+    "microphone"
+  ]
+}
